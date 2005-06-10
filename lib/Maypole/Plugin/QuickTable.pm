@@ -7,10 +7,10 @@ use NEXT;
 
 use HTML::QuickTable;
 
-use Maypole::Config;
-Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
+#use Maypole::Config;
+#Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.1;
+our $VERSION = 0.11;
 
 =head1 NAME
 
@@ -34,30 +34,38 @@ sub setup
     
     $r->NEXT::DISTINCT::setup( @_ );
 
-    $r->config->{quicktable_defaults} ||= {};
+    #$r->config->{quicktable_defaults} ||= {};
     
     my $model = $r->config->model ||
         die "Please configure a model in $r before calling setup()";    
+        
+    $model->mk_classdata( 'quicktable_defaults', {} );
     
-    no strict 'refs';
-    *{"$model\::quicktable_defaults"} = sub {{}};
+    #no strict 'refs';
+    #*{"$model\::quicktable_defaults"} = sub {{}};
 }
 
 =item quick_table
 
-Returns a L<HTML::QuickTable|HTML::QuickTable> object for formatting data. Set 
-global defaults in the C<quicktable_defaults> slot of the config object. Set class-specific 
-defaults by defining a C<quicktable_defaults> method in the class. Override these by passing 
-args to the C<quick_table> call.
+Returns a L<HTML::QuickTable|HTML::QuickTable> object for formatting data. 
 
     print $request->quick_table( %args )->render( $data );
 
+The method gathers arguments from the C<quicktable_defaults> method on the model class. This 
+is a L<Class::Data::Inheritable|Class::Data::Inheritable> method, so you can set global 
+defaults on the main model class, and then override them in model subclasses. To preserve 
+most settings and override others, say something like
+
+    $sub_model->quicktable_defaults( { %{ $model->quicktable_defaults }, %hash_of_overrides } );
+
+Arguments passed in the method call override those stored on the model.
+
 Pass a Maypole/CDBI object in the C<object> slot, and its data will be extracted 
-and C<<$qt->render>> called for you:
+and C<< $qt->render >> called for you:
 
     print $request->quick_table( %args, object => $object );
     
-Foreign objects will be displayed as links to the view template. 
+Related objects will be displayed as links to their view template. 
 
 =cut
 
@@ -65,8 +73,7 @@ sub quick_table
 {
     my $self = shift;
     
-    my %args = ( %{ $self->config->quicktable_defaults }, 
-                 %{ $self->model_class->quicktable_defaults }, 
+    my %args = ( %{ $self->model_class->quicktable_defaults }, 
                  @_,
                  );    
          
@@ -83,10 +90,15 @@ sub quick_table
     return $qt->render( [ $self->tabulate( $object, with_colnames => 1 ) ] );
 }
 
-=item tabulate( $object|$arrayref_of_objects, [ $with_colnames ] )
+=item tabulate( $object|$arrayref_of_objects, %args )
 
-Extract data from a Maypole/CDBI object (or multiple objects), ready to pass to C<<quick_table->render>>. 
-Data will start with a row of column names if C<$with_colnames> is true. 
+Extract data from a Maypole/CDBI object (or multiple objects), ready to pass to C<< quick_table->render >>. 
+Data will start with a row of column names if C<$args{with_colnames}> is true. 
+
+A callback subref can be passed in C<$args{callback}>. It will be called in turn with each object as 
+its argument. The result(s) of the call will be added to the row of data for that object. See 
+the C<list> template in L<Maypole::FormBuilder|Maypole::FormBuilder>, which uses this technique 
+to add C<edit> and C<delete> buttons to each row. 
 
 =cut
 
@@ -138,6 +150,20 @@ sub _tabulate
                  
     return $data;
 }
+
+=back
+
+=head2 Template replacement methods
+
+The following methods replace a couple of templates/macros in the main Maypole distribution. 
+They are used here to construct links to related items. They are also used in the 
+L<Maypole::FormBuilder|Maypole::FormBuilder> templates. 
+
+Notice that if you build all paths using these methods in your templates, you can modify the 
+path structure used in your site by overriding just two methods: C<Maypole::parse_path()> and 
+C<Maypole::Plugin::QuickTable::make_path()>.
+
+=over
 
 =item maybe_link_view( $thing )
 
@@ -226,8 +252,6 @@ C<bug-maypole-plugin-quicktable@rt.cpan.org>, or through the web interface at
 L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Maypole-Plugin-QuickTable>.
 I will be notified, and then you'll automatically be notified of progress on
 your bug as I make changes.
-
-=head1 ACKNOWLEDGEMENTS
 
 =head1 COPYRIGHT & LICENSE
 
