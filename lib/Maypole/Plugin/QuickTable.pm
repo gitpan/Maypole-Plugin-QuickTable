@@ -10,7 +10,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.11;
+our $VERSION = 0.2;
 
 =head1 NAME
 
@@ -79,6 +79,7 @@ sub quick_table
          
     my $object = delete $args{object};
       
+    # this allows the caller to pass in some prepackaged data and get a table back 
     return HTML::QuickTable->new( %args ) unless $object;                    
     
     $args{labels} ||= 1;
@@ -100,6 +101,12 @@ its argument. The result(s) of the call will be added to the row of data for tha
 the C<list> template in L<Maypole::FormBuilder|Maypole::FormBuilder>, which uses this technique 
 to add C<edit> and C<delete> buttons to each row. 
 
+Arguments:
+
+    callback        coderef
+    with_colnames   boolean
+    fields          defaults to $object->display_columns
+
 =cut
 
 # HTML::QuickTable seems to accept an array of arrayrefs, which is undocumented, but 
@@ -112,7 +119,12 @@ sub tabulate
     
     my @objects = ref( $objects ) eq 'ARRAY' ? @$objects : ( $objects );
     
-    my @data = map { $self->_tabulate( $_, $args{callback} ) } @objects; 
+    # related() gives has_many fields - should probably also get might_have fields too
+    # (the forms in editlistview will show might_have fields)
+    my @fields = $args{fields} ? @{ $args{fields} } : 
+                                 ( $self->model_class->display_columns, $self->model_class->related );
+                                 
+    my @data = map { $self->_tabulate( $_, \@fields, $args{callback} ) } @objects; 
     
     return @data unless $args{with_colnames};
     
@@ -121,29 +133,49 @@ sub tabulate
     unless ( @data )
     {
         my @empty_row;
-        push( @empty_row, '' ) for $self->model_class->display_columns;
-        @data = ( [ @empty_row ] );
+        push( @empty_row, '' ) for @fields;
+        # my @empty_row = ( '' ) x @fields;
+        @data = ( [ @empty_row ] ); 
     }
     
     #my %names = $objects[0]->column_names;
     my %names = $self->model_class->column_names;
     
-    unshift @data, [ map { $names{ $_ } } $self->model_class->display_columns ];
+    # not all fields are columns, hence the ucfirst fallback for has_many etc
+    unshift @data, [ map { $names{ $_ } || ucfirst( $_ ) } @fields ];
 
     return @data;
 }
 
+# Return an arrayref of values for a single object, which will be passed to 
+# QuickTable and rendered as a row in the table. The callback is optional, and 
+# can be used to add extra entries to the row. Column values that inflate to CDBI 
+# objects will be rendered as links to the view template. Column values that inflate 
+# to non-CDBI objects will be returned as the object, which will presumably be evaluated 
+# in string context at some point in QT render.
 sub _tabulate
 {
-    my ( $self, $object, $callback ) = @_;
+    my ( $self, $object, $cols, $callback ) = @_;
     
     my $str_col = $object->stringify_column;
     
-    my @cols = $object->display_columns;
+    if ( $self->debug && ! $str_col )
+    {
+        warn sprintf "No stringify_column specified in %s - please define a 'Stringify' column " .
+            "group with a single column", ref( $object );
+    }
     
+    # XXX: getting a 'Use of uninitialized value in string eq warning' - looks like 
+    # $object->stringify_column can return undef?
     my $data = [ map { $self->maybe_link_view( $_ ) } 
-                 map { $_ eq $str_col ? $object : $object->get( $_ ) } 
-                 @cols 
+    
+                 # for the stringification column (e.g. 'name'), return the object, which 
+                 # will be translated into a link to the 'view' template by 
+                 # maybe_link_view. Otherwise, return the value, which will be rendered 
+                 # verbatim, unless it is an object in a related class, in which case 
+                 # it will be rendered as a link to the view template.
+                 map { $_ eq $str_col ? $object : $self->maybe_many_link_views( $object->$_ ) } 
+                 @$cols 
                  ];
                  
     push( @$data, $callback->( $object ) ) if $callback;
@@ -183,6 +215,28 @@ sub maybe_link_view
                         additional => $thing->id,
                         label      => $thing,
                         );
+}
+
+=item maybe_many_link_views
+
+Runs multiple items through C<maybe_link_view>, returning the results marked up as a list.
+
+=cut
+
+# if the accessor is for a has_many relationship, it might return multiple items, which 
+# would each be passed individually to maybe_link_view(), and then each would go in its 
+# own column. Instead, we want a list of items to put in a single cell.
+sub maybe_many_link_views
+{
+    my ( $self, @values ) = @_;
+    
+    return @values unless @values > 1;
+    
+    my $html = "<ul>\n";
+    $html .= "<li>" . $self->maybe_link_view( $_ ) . "</li>\n" for @values;
+    $html .= "</ul>\n";
+
+    return $html;
 }
 
 =item link( %args )

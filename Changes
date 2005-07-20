@@ -1,5 +1,11 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.2    Wed  20 July 2005, 01:00
+        - added 'fields' argument to tabulate() - it was hard-wired to 
+            use display_columns
+            - fields defaults to display_columns + related (i.e. db columns plus has_many accessors)
+        - added maybe_many_link_views() method
+
 0.11   Fri  10 Jun 2005, 12:40
         - POD fixes
         - changed the location of quicktable_defaults. Now it's 
