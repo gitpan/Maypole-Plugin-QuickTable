@@ -10,7 +10,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.2;
+our $VERSION = 0.3;
 
 =head1 NAME
 
@@ -128,22 +128,83 @@ sub tabulate
     
     return @data unless $args{with_colnames};
     
+    #
+    # build clickable column headers to control sorting - from Ron McClain
+    #
+    
     # If no rows (e.g. no search results), return 1 empty row to cause the table 
     # headers to be printed correctly.
-    unless ( @data )
-    {
-        my @empty_row;
-        push( @empty_row, '' ) for @fields;
-        # my @empty_row = ( '' ) x @fields;
-        @data = ( [ @empty_row ] ); 
-    }
+    @data = ( [ ( '' ) x @fields ] ) unless @data; 
     
-    #my %names = $objects[0]->column_names;
+    # take a copy so we can delete things from it without removing data used elsewhere
+    my %params = %{ $self->params };
+    
+    # these come from the search form on the initial search
+    my ( $order_by, $order_dir ) = split /\s+/, $params{search_opt_order_by} if $params{search_opt_order_by};
+
+    # otherwise, from the header links
+    $order_by = $params{order} if $params{order};
+    $order_dir ||= $params{o2} || 'desc';
+    $order_dir = ( $order_dir eq 'desc' ) ? 'asc' : 'desc';
+  
+    delete $params{search_opt_order_by};
+    delete $params{order_by};
+    delete $params{o2};
+    delete $params{page};
+    
     my %names = $self->model_class->column_names;
     
-    # not all fields are columns, hence the ucfirst fallback for has_many etc
-    unshift @data, [ map { $names{ $_ } || ucfirst( $_ ) } @fields ];
+    my @headers;
 
+    foreach my $field ( @fields ) 
+    {
+        # is this a column? - it might be a has_many field instead
+        if ( $names{ $field } )
+        {
+            my $uri = URI->new;
+        
+            if ( $self->action eq 'do_search' ) 
+            {
+                $params{search_opt_order_by} = "$field $order_dir";
+            } 
+            elsif ( $self->action eq 'list' ) 
+            {
+                $params{order} = $field;
+                $params{o2}    = $order_dir;
+            } 
+            else 
+            {
+                %params = ( order => $field,
+                            o2    => $order_dir
+                            );
+            }
+            
+            $uri->query_form( %params );
+            
+            my $arrow = '';
+            
+            if ( $order_by eq $field )
+            {
+                $arrow = $order_dir eq 'asc' ? '&nbsp;&darr;' : '&nbsp;&uarr;';
+            }
+                
+            my $args = "?".$uri->equery;
+        
+            push @headers,  $self->link( table      => $self->model_class->table,
+                                         action     => $self->action,
+                                         additional => $args,
+                                         label      => $names{ $field } . $arrow,
+                                         );
+        }
+        else
+        {
+            # has_many, might_have fields
+            push @headers, ucfirst( $field );
+        }
+    }
+    
+    unshift @data, \@headers;
+    
     return @data;
 }
 
@@ -230,7 +291,13 @@ sub maybe_many_link_views
 {
     my ( $self, @values ) = @_;
     
-    return @values unless @values > 1;
+    # if values, it means a has_many/might_have column with no entries. We 
+    # need to return something to push onto the row, or the row will have too 
+    # few columns
+    return '' unless @values;
+    
+    # no need to build a list for a single value
+    return @values if @values == 1;
     
     my $html = "<ul>\n";
     $html .= "<li>" . $self->maybe_link_view( $_ ) . "</li>\n" for @values;

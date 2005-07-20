@@ -1,5 +1,12 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.3    Wed  20 July 2005, 12:00
+        - added code from Ron McClain to support clickable search-by column headers 
+        - empty has_many columns were not being rendered in listview (now they are 
+            rendered as an empty table cell, so keeping in sync with column headers)
+            because maybe_many_link_views() was returning an empty list when supplied 
+            with an empty list of values. Now it returns ''
+
 0.2    Wed  20 July 2005, 01:00
         - added 'fields' argument to tabulate() - it was hard-wired to 
             use display_columns
