@@ -1,5 +1,9 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.301  Thur 21 July 2005, 09:45
+        - test if a Maypole::Model thing is an object or a class in maybe_link_view
+        - test definedness of $order_by before doing string comparison in tabulate
+
 0.3    Wed  20 July 2005, 12:00
         - added code from Ron McClain to support clickable search-by column headers 
         - empty has_many columns were not being rendered in listview (now they are 

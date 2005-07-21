@@ -10,7 +10,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.3;
+our $VERSION = 0.301;
 
 =head1 NAME
 
@@ -183,7 +183,7 @@ sub tabulate
             
             my $arrow = '';
             
-            if ( $order_by eq $field )
+            if ( $order_by and $order_by eq $field )
             {
                 $arrow = $order_dir eq 'asc' ? '&nbsp;&darr;' : '&nbsp;&uarr;';
             }
@@ -269,7 +269,10 @@ sub maybe_link_view
 {
     my ( $self, $thing ) = @_; 
     
-    return $thing unless UNIVERSAL::isa( $thing, 'Maypole::Model::Base' );
+    # links are only relevant for objects, not classes (for instance, M::P::Authorize 
+    # stores class names in a db table, and returns them as strings, which we don't 
+    # want to attempt to build links to - reported by Ron McClain)
+    return $thing unless ref( $thing ) && UNIVERSAL::isa( $thing, 'Maypole::Model::Base' );
     
     return $self->link( table      => $thing->table,
                         action     => 'view',
