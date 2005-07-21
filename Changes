@@ -1,5 +1,9 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.302  Thur 21 July 2005, 10:00
+        - maybe_link_view was not handling non-Maypole objects properly - now 
+            it stringifies them
+
 0.301  Thur 21 July 2005, 09:45
         - test if a Maypole::Model thing is an object or a class in maybe_link_view
         - test definedness of $order_by before doing string comparison in tabulate

@@ -10,7 +10,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.301;
+our $VERSION = 0.302;
 
 =head1 NAME
 
@@ -260,7 +260,7 @@ C<Maypole::Plugin::QuickTable::make_path()>.
 
 =item maybe_link_view( $thing )
 
-Returns C<$thing> unless it isa C<Maypole::Model::Base>, in which case 
+Returns C<$thing> unless it isa C<Maypole::Model::Base> object, in which case 
 a link to the view template for the object is returned.
 
 =cut
@@ -269,10 +269,9 @@ sub maybe_link_view
 {
     my ( $self, $thing ) = @_; 
     
-    # links are only relevant for objects, not classes (for instance, M::P::Authorize 
-    # stores class names in a db table, and returns them as strings, which we don't 
-    # want to attempt to build links to - reported by Ron McClain)
-    return $thing unless ref( $thing ) && UNIVERSAL::isa( $thing, 'Maypole::Model::Base' );
+    return $thing unless ref( $thing );
+     
+    $thing = ''.$thing unless UNIVERSAL::isa( $thing, 'Maypole::Model::Base' );    
     
     return $self->link( table      => $thing->table,
                         action     => 'view',
