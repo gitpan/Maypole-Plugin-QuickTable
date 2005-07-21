@@ -1,5 +1,8 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.303  Thur 21 July 2005, 11:40
+        - um, now it stringifies *and returns* them
+
 0.302  Thur 21 July 2005, 10:00
         - maybe_link_view was not handling non-Maypole objects properly - now 
             it stringifies them

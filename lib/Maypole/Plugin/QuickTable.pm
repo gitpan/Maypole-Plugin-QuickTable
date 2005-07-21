@@ -10,7 +10,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.302;
+our $VERSION = 0.303;
 
 =head1 NAME
 
@@ -269,9 +269,7 @@ sub maybe_link_view
 {
     my ( $self, $thing ) = @_; 
     
-    return $thing unless ref( $thing );
-     
-    $thing = ''.$thing unless UNIVERSAL::isa( $thing, 'Maypole::Model::Base' );    
+    return ''.$thing unless ref( $thing ) && UNIVERSAL::isa( $thing, 'Maypole::Model::Base' );    
     
     return $self->link( table      => $thing->table,
                         action     => 'view',
