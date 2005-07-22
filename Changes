@@ -1,5 +1,8 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.32   Fri 22 July 2005, 23:00
+        - added a field_callback argument to tabulate() - see an example in the 
+            Maypole edit template
 
 0.31   Fri  22 July 2005, 00:50
         - tabulate() now defaults to showing columns for display_columns + related. 

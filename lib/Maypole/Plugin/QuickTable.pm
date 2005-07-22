@@ -10,7 +10,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.31;
+our $VERSION = 0.32;
 
 =head1 NAME
 
@@ -60,12 +60,29 @@ most settings and override others, say something like
 
 Arguments passed in the method call override those stored on the model.
 
+ARguments are passed directly to C<< HTML::QuickTable->new >>, so see L<HTML::QuickTable> for a 
+description. 
+
+Additional arguments are: 
+
+    object  =>  a Maypole/CDBI object
+
 Pass a Maypole/CDBI object in the C<object> slot, and its data will be extracted 
 and C<< $qt->render >> called for you:
 
     print $request->quick_table( %args, object => $object );
     
 Related objects will be displayed as links to their view template. 
+
+If no object is supplied, a L<HTML::QuickTable> object is returned. If an object is 
+supplied, it is passed to C<tabulate> to extract its data, and the data passed to the 
+C<render> method of the L<HTML::QuickTable> object. 
+
+To render a subset of an object's columns, say:
+
+    my @data = $request->tabulate( objects => $object, with_colnames => 1, fields => [ qw( foo bar ) ] );
+    
+    $request->quick_table( @data );
 
 =cut
 
@@ -101,9 +118,13 @@ its argument. The result(s) of the call will be added to the row of data for tha
 the C<list> template in L<Maypole::FormBuilder|Maypole::FormBuilder>, which uses this technique 
 to add C<edit> and C<delete> buttons to each row. 
 
+Similarly, a C<field_callback> coderef will be called during rendering of each field, receiving the 
+object and the current field as arguments. See the C<addmany> template for an example.
+
 Arguments:
 
     callback        coderef
+    field_callback  coderef
     with_colnames   boolean
     fields          defaults to ( $request->model_class->display_columns, $request->model_class->related )
     objects         defaults to $request->objects
@@ -126,7 +147,7 @@ sub tabulate
     my @fields = $args{fields} ? @{ $args{fields} } : 
                                  ( $self->model_class->display_columns, $self->model_class->related );
                                  
-    my @data = map { $self->_tabulate_object( $_, \@fields, $args{callback} ) } @objects; 
+    my @data = map { $self->_tabulate_object( $_, \@fields, $args{callback}, $args{field_callback} ) } @objects; 
     
     return @data unless $args{with_colnames};
     
@@ -218,7 +239,7 @@ sub tabulate
 # in string context at some point in QT render.
 sub _tabulate_object
 {
-    my ( $self, $object, $cols, $callback ) = @_;
+    my ( $self, $object, $cols, $callback, $field_callback ) = @_;
     
     my $str_col = $object->stringify_column || ''; # '' to silence warnings in the map
     
@@ -239,6 +260,11 @@ sub _tabulate_object
                # it will be rendered as a link to the view template.
                map { $_ eq $str_col ? $object : $self->maybe_many_link_views( $object->$_ ) } 
                @$cols;
+               
+    if ( $field_callback )
+    {
+        @data = map { [ $_, $field_callback->( $object, shift( @$cols ) ) ] } @data;    
+    }
                  
     push( @data, $callback->( $object ) ) if $callback;
                  
