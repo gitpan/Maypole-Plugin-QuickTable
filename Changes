@@ -1,5 +1,14 @@
 Revision history for Maypole-Plugin-QuickTable
 
+
+0.31   Fri  22 July 2005, 00:50
+        - tabulate() now defaults to showing columns for display_columns + related. 
+        - tabulate now accepts objects as an optional *named* argument, and not as a required 
+            positional argument. If not supplied, defaults to $request->objects
+        - renamed _tabulate to _tabulate_object
+        - fixed excessive warnings from _tabulate_object if no stringify_column (still issues 
+            some warnings in debug mode)
+
 0.303  Thur 21 July 2005, 11:40
         - um, now it stringifies *and returns* them
 

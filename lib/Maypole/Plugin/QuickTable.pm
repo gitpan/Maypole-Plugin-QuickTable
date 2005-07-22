@@ -10,7 +10,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.303;
+our $VERSION = 0.31;
 
 =head1 NAME
 
@@ -88,7 +88,7 @@ sub quick_table
     
     #die Data::Dumper::Dumper( [ $self->tabulate( $object, 1 ) ] );
     
-    return $qt->render( [ $self->tabulate( $object, with_colnames => 1 ) ] );
+    return $qt->render( [ $self->tabulate( objects => $object, with_colnames => 1 ) ] );
 }
 
 =item tabulate( $object|$arrayref_of_objects, %args )
@@ -105,7 +105,8 @@ Arguments:
 
     callback        coderef
     with_colnames   boolean
-    fields          defaults to $object->display_columns
+    fields          defaults to ( $request->model_class->display_columns, $request->model_class->related )
+    objects         defaults to $request->objects
 
 =cut
 
@@ -115,16 +116,17 @@ Arguments:
 # so it seems safe to rely on.
 sub tabulate
 {
-    my ( $self, $objects, %args ) = @_;
+    my ( $self, %args ) = @_;
+    
+    my $objects = $args{objects} || $self->objects;
     
     my @objects = ref( $objects ) eq 'ARRAY' ? @$objects : ( $objects );
     
     # related() gives has_many fields - should probably also get might_have fields too
-    # (the forms in editlistview will show might_have fields)
     my @fields = $args{fields} ? @{ $args{fields} } : 
                                  ( $self->model_class->display_columns, $self->model_class->related );
                                  
-    my @data = map { $self->_tabulate( $_, \@fields, $args{callback} ) } @objects; 
+    my @data = map { $self->_tabulate_object( $_, \@fields, $args{callback} ) } @objects; 
     
     return @data unless $args{with_colnames};
     
@@ -214,11 +216,11 @@ sub tabulate
 # objects will be rendered as links to the view template. Column values that inflate 
 # to non-CDBI objects will be returned as the object, which will presumably be evaluated 
 # in string context at some point in QT render.
-sub _tabulate
+sub _tabulate_object
 {
     my ( $self, $object, $cols, $callback ) = @_;
     
-    my $str_col = $object->stringify_column;
+    my $str_col = $object->stringify_column || ''; # '' to silence warnings in the map
     
     if ( $self->debug && ! $str_col )
     {
@@ -228,20 +230,19 @@ sub _tabulate
     
     # XXX: getting a 'Use of uninitialized value in string eq warning' - looks like 
     # $object->stringify_column can return undef?
-    my $data = [ map { $self->maybe_link_view( $_ ) } 
+    my @data = map { $self->maybe_link_view( $_ ) } 
     
-                 # for the stringification column (e.g. 'name'), return the object, which 
-                 # will be translated into a link to the 'view' template by 
-                 # maybe_link_view. Otherwise, return the value, which will be rendered 
-                 # verbatim, unless it is an object in a related class, in which case 
-                 # it will be rendered as a link to the view template.
-                 map { $_ eq $str_col ? $object : $self->maybe_many_link_views( $object->$_ ) } 
-                 @$cols 
-                 ];
+               # for the stringification column (e.g. 'name'), return the object, which 
+               # will be translated into a link to the 'view' template by 
+               # maybe_link_view. Otherwise, return the value, which will be rendered 
+               # verbatim, unless it is an object in a related class, in which case 
+               # it will be rendered as a link to the view template.
+               map { $_ eq $str_col ? $object : $self->maybe_many_link_views( $object->$_ ) } 
+               @$cols;
                  
-    push( @$data, $callback->( $object ) ) if $callback;
+    push( @data, $callback->( $object ) ) if $callback;
                  
-    return $data;
+    return \@data;
 }
 
 =back
@@ -322,10 +323,8 @@ sub link
 {
     my ( $self, %args ) = @_;
     
-    do { die "no $_" unless $args{ $_ } } for qw( table
-                                                  action
-                                                  label
-                                                  );    
+    do { die "no $_ (got table: $args{table} action: $args{action} label: $args{label})" 
+        unless $args{ $_ } } for qw( table action label );    
     
     my $path = $self->make_path( %args );
     
