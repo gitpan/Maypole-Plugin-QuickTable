@@ -10,7 +10,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.32;
+our $VERSION = 0.321;
 
 =head1 NAME
 
@@ -222,7 +222,10 @@ sub tabulate
         else
         {
             # has_many, might_have fields
-            push @headers, ucfirst( $field );
+            my $related_class = $self->model_class->related_class( $self, $field );
+            my $field_name = $related_class->plural_moniker;
+            #push @headers, ucfirst( $field );
+            push @headers, ucfirst( $field_name );
         }
     }
     

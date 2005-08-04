@@ -1,5 +1,9 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.321  Thur 4  Aug 2005, 17:10
+        - tabulate() now uses the plural_moniker() of related (i.e. has_many) fields 
+            when generating a heading for the field 
+
 0.32   Fri 22 July 2005, 23:00
         - added a field_callback argument to tabulate() - see an example in the 
             Maypole edit template
