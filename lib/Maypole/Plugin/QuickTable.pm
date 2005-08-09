@@ -3,6 +3,8 @@ package Maypole::Plugin::QuickTable;
 use warnings;
 use strict;
 
+use URI;
+
 use NEXT;
 
 use HTML::QuickTable;
@@ -10,7 +12,7 @@ use HTML::QuickTable;
 #use Maypole::Config;
 #Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
 
-our $VERSION = 0.321;
+our $VERSION = 0.322;
 
 =head1 NAME
 
@@ -329,9 +331,9 @@ sub maybe_many_link_views
     # no need to build a list for a single value
     return @values if @values == 1;
     
-    my $html = "<ul>\n";
+    my $html = "<ol>\n";
     $html .= "<li>" . $self->maybe_link_view( $_ ) . "</li>\n" for @values;
-    $html .= "</ul>\n";
+    $html .= "</ol>\n";
 
     return $html;
 }

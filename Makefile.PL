@@ -8,7 +8,8 @@ WriteMakefile
                            'HTML::QuickTable' => '0',
                            'Maypole::Config' => '0',
                            'NEXT' => '0',
-                           'Test::More' => '0'
+                           'Test::More' => '0',
+                           'URI' => '0'
                          },
           'INSTALLDIRS' => 'site',
           'PL_FILES' => {}

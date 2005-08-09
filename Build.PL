@@ -12,6 +12,7 @@ my $builder = Module::Build->new(
         'NEXT' => 0,
         'HTML::QuickTable' => 0,
         'Maypole::Config' => 0,
+        'URI'   => 0,
     },
     add_to_cleanup      => [ 'Maypole-Plugin-QuickTable-*' ],
     create_makefile_pl  => 'traditional',
