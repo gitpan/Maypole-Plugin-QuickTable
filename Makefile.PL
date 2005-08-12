@@ -7,6 +7,7 @@ WriteMakefile
           'PREREQ_PM' => {
                            'HTML::QuickTable' => '0',
                            'Maypole::Config' => '0',
+                           'Maypole::Plugin::LinkTools' => '0',
                            'NEXT' => '0',
                            'Test::More' => '0',
                            'URI' => '0'

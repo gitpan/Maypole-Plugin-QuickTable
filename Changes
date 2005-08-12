@@ -1,5 +1,12 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.4     Fri  12 Aug 2005, 17:30
+        - removed link-generating methods, and re-packaged in Maypole::Plugin::LinkTools
+        - added Maypole::Plugin::LinkTools as a dependency
+        - extracts field list from the object being processed, rather than the request's 
+            model class
+        - refactored header link generating code into a separate method
+
 0.322   Tues 9 Aug  2005, 1:20
         - added use URI (spotted by Dave Howorth)
 

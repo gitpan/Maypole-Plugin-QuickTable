@@ -3,24 +3,21 @@ package Maypole::Plugin::QuickTable;
 use warnings;
 use strict;
 
-use URI;
+use URI();
 
 use NEXT;
 
 use HTML::QuickTable;
 
-#use Maypole::Config;
-#Maypole::Config->mk_accessors( qw( quicktable_defaults ) );
-
-our $VERSION = 0.322;
+our $VERSION = 0.4;
 
 =head1 NAME
 
-Maypole::Plugin::QuickTable - HTML::QuickTable goodness for Maypole
+Maypole::Plugin::QuickTable - HTML::QuickTable convenience 
 
 =head1 SYNOPSIS
 
-    use Maypole::Application qw( QuickTable );
+    use Maypole::Application qw( LinkTools QuickTable );
 
 =head1 METHODS
 
@@ -36,15 +33,14 @@ sub setup
     
     $r->NEXT::DISTINCT::setup( @_ );
 
-    #$r->config->{quicktable_defaults} ||= {};
+    warn "Running " . __PACKAGE__ . " setup for $r" if $r->debug;
     
     my $model = $r->config->model ||
         die "Please configure a model in $r before calling setup()";    
         
+    warn "quicktable_defaults are shared by ALL models - cf. fb_defaults, which had this same bug" 
+        if $r->debug > 1;
     $model->mk_classdata( 'quicktable_defaults', {} );
-    
-    #no strict 'refs';
-    #*{"$model\::quicktable_defaults"} = sub {{}};
 }
 
 =item quick_table
@@ -62,7 +58,7 @@ most settings and override others, say something like
 
 Arguments passed in the method call override those stored on the model.
 
-ARguments are passed directly to C<< HTML::QuickTable->new >>, so see L<HTML::QuickTable> for a 
+Arguments are passed directly to C<< HTML::QuickTable->new >>, so see L<HTML::QuickTable> for a 
 description. 
 
 Additional arguments are: 
@@ -90,22 +86,20 @@ To render a subset of an object's columns, say:
 
 sub quick_table
 {
-    my $self = shift;
+    my ( $self, %args ) = @_;
     
-    my %args = ( %{ $self->model_class->quicktable_defaults }, 
-                 @_,
-                 );    
-         
     my $object = delete $args{object};
       
     # this allows the caller to pass in some prepackaged data and get a table back 
-    return HTML::QuickTable->new( %args ) unless $object;                    
+    return HTML::QuickTable->new( %args ) unless $object;      
     
+    my $model_class = ref( $object ) || $object;
+    
+    %args = ( %{ $model_class->quicktable_defaults }, %args );    
+         
     $args{labels} ||= 1;
     
     my $qt = HTML::QuickTable->new( %args );
-    
-    #die Data::Dumper::Dumper( [ $self->tabulate( $object, 1 ) ] );
     
     return $qt->render( [ $self->tabulate( objects => $object, with_colnames => 1 ) ] );
 }
@@ -144,22 +138,37 @@ sub tabulate
     my $objects = $args{objects} || $self->objects;
     
     my @objects = ref( $objects ) eq 'ARRAY' ? @$objects : ( $objects );
+
+    # assumes all objects are in the same class
+    my $model_class = ref( $objects[0] ) || $objects[0];
     
-    # related() gives has_many fields - should probably also get might_have fields too
     my @fields = $args{fields} ? @{ $args{fields} } : 
-                                 ( $self->model_class->display_columns, $self->model_class->related );
+                                 ( $model_class->view_columns, $model_class->view_fields );
                                  
     my @data = map { $self->_tabulate_object( $_, \@fields, $args{callback}, $args{field_callback} ) } @objects; 
     
     return @data unless $args{with_colnames};
     
-    #
-    # build clickable column headers to control sorting - from Ron McClain
-    #
-    
     # If no rows (e.g. no search results), return 1 empty row to cause the table 
     # headers to be printed correctly.
     @data = ( [ ( '' ) x @fields ] ) unless @data; 
+    
+    my %names = ( $model_class->column_names, $model_class->field_names );
+    
+    my @headers = $self->action eq 'list' ? $self->_make_linked_headers( $model_class, \@fields ) :
+                                            map { $names{ $_ } } @fields;
+
+    unshift @data, \@headers;
+    
+    return @data;
+}
+
+# build clickable column headers to control sorting - from Ron McClain
+sub _make_linked_headers
+{
+    my ( $self, $model_class, $fields ) = @_;
+
+    my %names = $model_class->column_names;
     
     # take a copy so we can delete things from it without removing data used elsewhere
     my %params = %{ $self->params };
@@ -177,11 +186,9 @@ sub tabulate
     delete $params{o2};
     delete $params{page};
     
-    my %names = $self->model_class->column_names;
-    
     my @headers;
-
-    foreach my $field ( @fields ) 
+    
+    foreach my $field ( @$fields ) 
     {
         # is this a column? - it might be a has_many field instead
         if ( $names{ $field } )
@@ -231,9 +238,7 @@ sub tabulate
         }
     }
     
-    unshift @data, \@headers;
-    
-    return @data;
+    return @headers;
 }
 
 # Return an arrayref of values for a single object, which will be passed to 
@@ -254,6 +259,13 @@ sub _tabulate_object
             "group with a single column", ref( $object );
     }
     
+    my $lister = sub 
+    {
+        return '' unless @_;
+        return @_ if @_ == 1;
+        return join( "\n", '<ol>', ( map { "<li>$_</li>" } @_ ), '</ol>' );
+    };
+    
     # XXX: getting a 'Use of uninitialized value in string eq warning' - looks like 
     # $object->stringify_column can return undef?
     my @data = map { $self->maybe_link_view( $_ ) } 
@@ -263,7 +275,7 @@ sub _tabulate_object
                # maybe_link_view. Otherwise, return the value, which will be rendered 
                # verbatim, unless it is an object in a related class, in which case 
                # it will be rendered as a link to the view template.
-               map { $_ eq $str_col ? $object : $self->maybe_many_link_views( $object->$_ ) } 
+               map { $_ eq $str_col ? $object : $lister->( $self->maybe_many_link_views( $object->$_ ) ) } 
                @$cols;
                
     if ( $field_callback )
@@ -278,120 +290,6 @@ sub _tabulate_object
 
 =back
 
-=head2 Template replacement methods
-
-The following methods replace a couple of templates/macros in the main Maypole distribution. 
-They are used here to construct links to related items. They are also used in the 
-L<Maypole::FormBuilder|Maypole::FormBuilder> templates. 
-
-Notice that if you build all paths using these methods in your templates, you can modify the 
-path structure used in your site by overriding just two methods: C<Maypole::parse_path()> and 
-C<Maypole::Plugin::QuickTable::make_path()>.
-
-=over
-
-=item maybe_link_view( $thing )
-
-Returns C<$thing> unless it isa C<Maypole::Model::Base> object, in which case 
-a link to the view template for the object is returned.
-
-=cut
-
-sub maybe_link_view
-{
-    my ( $self, $thing ) = @_; 
-    
-    return ''.$thing unless ref( $thing ) && UNIVERSAL::isa( $thing, 'Maypole::Model::Base' );    
-    
-    return $self->link( table      => $thing->table,
-                        action     => 'view',
-                        additional => $thing->id,
-                        label      => $thing,
-                        );
-}
-
-=item maybe_many_link_views
-
-Runs multiple items through C<maybe_link_view>, returning the results marked up as a list.
-
-=cut
-
-# if the accessor is for a has_many relationship, it might return multiple items, which 
-# would each be passed individually to maybe_link_view(), and then each would go in its 
-# own column. Instead, we want a list of items to put in a single cell.
-sub maybe_many_link_views
-{
-    my ( $self, @values ) = @_;
-    
-    # if values, it means a has_many/might_have column with no entries. We 
-    # need to return something to push onto the row, or the row will have too 
-    # few columns
-    return '' unless @values;
-    
-    # no need to build a list for a single value
-    return @values if @values == 1;
-    
-    my $html = "<ol>\n";
-    $html .= "<li>" . $self->maybe_link_view( $_ ) . "</li>\n" for @values;
-    $html .= "</ol>\n";
-
-    return $html;
-}
-
-=item link( %args )
-
-Returns a link, calling C<make_path> to generate the path. 
-
-    %args = ( table      => $table,
-              action     => $action,        # called 'command' in the original link template
-              additional => $additional,    # optional - generally an object ID
-              label      => $label,
-              );
-
-=cut
-
-sub link
-{
-    my ( $self, %args ) = @_;
-    
-    do { die "no $_ (got table: $args{table} action: $args{action} label: $args{label})" 
-        unless $args{ $_ } } for qw( table action label );    
-    
-    my $path = $self->make_path( %args );
-    
-    return sprintf '<a href="%s">%s</a>', $path, $args{label};
-}
-
-=item make_path( %args )
-
-This is the counterpart to C<Maypole::parse_path>. It generates a path to use in links, 
-form actions etc. To implement your own path scheme, just override this method and C<parse_path>.
-
-    %args = ( table      => $table,
-              action     => $action,        # called 'command' in the original link template
-              additional => $additional,    # optional - generally an object ID
-              );
-
-=cut
-
-sub make_path
-{
-    my ( $self, %args ) = @_;
-
-    do { die "no $_" unless $args{ $_ } } for qw( table
-                                                  action
-                                                  );    
-
-    my $base = $self->config->uri_base;
-    $base = '' if $base eq '/';
-        
-    my $add = $args{additional} ? "/$args{additional}" : '';
-    
-    return sprintf '%s/%s/%s%s', $base, $args{table}, $args{action}, $add;
-}
-
-=back
- 
 =head1 AUTHOR
 
 David Baird, C<< <cpan@riverside-cms.co.uk> >>
