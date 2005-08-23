@@ -9,7 +9,7 @@ use NEXT;
 
 use HTML::QuickTable;
 
-our $VERSION = 0.4;
+our $VERSION = 0.41;
 
 =head1 NAME
 
@@ -37,6 +37,9 @@ sub setup
     
     my $model = $r->config->model ||
         die "Please configure a model in $r before calling setup()";    
+        
+    die __PACKAGE__ . " needs Maypole::Plugin::LinkTools"
+        unless $r->can( 'maybe_many_link_views' ); 
         
     warn "quicktable_defaults are shared by ALL models - cf. fb_defaults, which had this same bug" 
         if $r->debug > 1;
@@ -141,6 +144,13 @@ sub tabulate
 
     # assumes all objects are in the same class
     my $model_class = ref( $objects[0] ) || $objects[0];
+    
+    # If we're tabulating a set of search results, and the search returned no results, 
+    # there are no objects. I'm not sure at the moment whether this will return the correct 
+    # class in all cases - there might have been a template switcheroo, which was why this 
+    # method looks at the object's class and not the request's model class anyway. But 
+    # for the moment there's nothing else available:
+    $model_class ||= $self->model_class;
     
     my @fields = $args{fields} ? @{ $args{fields} } : 
                                  ( $model_class->view_columns, $model_class->view_fields );

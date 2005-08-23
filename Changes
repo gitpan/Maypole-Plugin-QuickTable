@@ -1,5 +1,11 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.41    Tues 23 August, 2005 12:00
+        - setup() dies if M::P::LinkTools isn't loaded (otherwise the error messages 
+            at runtime can be confusing/absent) (Dave Howorth)
+        - fix tabulate() for the case of a search returning no results - use $r->model_class 
+            instead of ref $objects[0]
+            
 0.4     Fri  12 Aug 2005, 17:30
         - removed link-generating methods, and re-packaged in Maypole::Plugin::LinkTools
         - added Maypole::Plugin::LinkTools as a dependency
