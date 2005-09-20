@@ -9,7 +9,7 @@ use NEXT;
 
 use HTML::QuickTable;
 
-our $VERSION = 0.41;
+our $VERSION = 0.42;
 
 =head1 NAME
 
@@ -178,77 +178,95 @@ sub _make_linked_headers
 {
     my ( $self, $model_class, $fields ) = @_;
 
-    my %names = $model_class->column_names;
+    my @headers;
     
+    foreach my $field ( @$fields ) 
+    {
+        push @headers, $self->orderby_link( $field, $model_class );
+    }
+    return @headers;
+}
+
+=item orderby_link( $field, [ $model_class ] )
+
+Build a link for a column header. Controls whether the table should be sorted by that 
+column. Toggles sort direction. 
+
+The C<$model_class> parameter is only necessary when building a table for a class different 
+from the current model class for the request.
+
+=cut
+
+# build clickable column headers to control sorting - from Ron McClain
+sub orderby_link 
+{
+    my ( $self, $field, $model_class )  = @_; 
+    
+    $model_class ||= $self->model_class;
+    
+    my %names = $model_class->column_names;
+
     # take a copy so we can delete things from it without removing data used elsewhere
     my %params = %{ $self->params };
     
     # these come from the search form on the initial search
-    my ( $order_by, $order_dir ) = split /\s+/, $params{search_opt_order_by} if $params{search_opt_order_by};
+    my($order_by, $order_dir);
+    ( $order_by, $order_dir ) = split /\s+/, $params{search_opt_order_by} if $params{search_opt_order_by};
 
     # otherwise, from the header links
     $order_by = $params{order} if $params{order};
     $order_dir ||= $params{o2} || 'desc';
     $order_dir = ( $order_dir eq 'desc' ) ? 'asc' : 'desc';
-  
     delete $params{search_opt_order_by};
     delete $params{order_by};
     delete $params{o2};
     delete $params{page};
-    
-    my @headers;
-    
-    foreach my $field ( @$fields ) 
+
+    # is this a column? - it might be a has_many field instead
+    if ( $names{ $field } )
     {
-        # is this a column? - it might be a has_many field instead
-        if ( $names{ $field } )
-        {
-            my $uri = URI->new;
+        my $uri = URI->new;
         
-            if ( $self->action eq 'do_search' ) 
-            {
-                $params{search_opt_order_by} = "$field $order_dir";
-            } 
-            elsif ( $self->action eq 'list' ) 
-            {
-                $params{order} = $field;
-                $params{o2}    = $order_dir;
-            } 
-            else 
-            {
-                %params = ( order => $field,
-                            o2    => $order_dir
-                            );
-            }
+        if ( $self->action eq 'do_search' ) 
+        {
+            $params{search_opt_order_by} = "$field $order_dir"
+        } 
+        elsif ( $self->action eq 'list' ) 
+        {
+            $params{order} = $field;
+            $params{o2}    = $order_dir;
+        } 
+        else 
+        {
+            %params = ( order => $field,
+                        o2    => $order_dir
+                        );
+        }
             
-            $uri->query_form( %params );
+        $uri->query_form( %params );
+        
+        my $arrow = '';
             
-            my $arrow = '';
-            
-            if ( $order_by and $order_by eq $field )
-            {
-                $arrow = $order_dir eq 'asc' ? '&nbsp;&darr;' : '&nbsp;&uarr;';
-            }
+        if ( $order_by and $order_by eq $field )
+        {
+            $arrow = $order_dir eq 'asc' ? '&nbsp;&darr;' : '&nbsp;&uarr;';
+        }
                 
-            my $args = "?".$uri->equery;
+        my $args = "?".$uri->equery;
         
-            push @headers,  $self->link( table      => $self->model_class->table,
-                                         action     => $self->action,
-                                         additional => $args,
-                                         label      => $names{ $field } . $arrow,
-                                         );
-        }
-        else
-        {
-            # has_many, might_have fields
-            my $related_class = $self->model_class->related_class( $self, $field );
-            my $field_name = $related_class->plural_moniker;
-            #push @headers, ucfirst( $field );
-            push @headers, ucfirst( $field_name );
-        }
+        return $self->link( table      => $self->model_class->table,
+                            action     => $self->action,
+                            additional => $args,
+                            label      => $names{ $field } . $arrow,
+                            );
     }
-    
-    return @headers;
+    else
+    {
+        # has_many, might_have fields
+        my $related_class = $self->model_class->related_class( $self, $field );
+        my $field_name = $related_class->plural_moniker;
+        return ucfirst( $field_name );
+    }
 }
 
 # Return an arrayref of values for a single object, which will be passed to 

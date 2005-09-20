@@ -1,5 +1,9 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.42    Tues 20 Sept, 2005 09:50
+        - provide orderby_link() as a public method, factored out of 
+            _make_linked_headers() (Ron McClain). 
+
 0.41    Tues 23 August, 2005 12:00
         - setup() dies if M::P::LinkTools isn't loaded (otherwise the error messages 
             at runtime can be confusing/absent) (Dave Howorth)
