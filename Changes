@@ -1,5 +1,8 @@
 Revision history for Maypole-Plugin-QuickTable
 
+0.421   Fri  23 Sept, 2005 23:05
+        - more compact output of multiple items in a table cell
+
 0.42    Tues 20 Sept, 2005 09:50
         - provide orderby_link() as a public method, factored out of 
             _make_linked_headers() (Ron McClain). 
