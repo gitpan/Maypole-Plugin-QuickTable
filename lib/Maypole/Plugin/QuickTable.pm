@@ -9,7 +9,7 @@ use NEXT;
 
 use HTML::QuickTable;
 
-our $VERSION = 0.421;
+our $VERSION = 0.422;
 
 =head1 NAME
 
@@ -292,8 +292,8 @@ sub _tabulate_object
         return '' unless @_;
         return @_ if @_ == 1;
         #return join( "\n", '<ol>', ( map { "<li>$_</li>" } @_ ), '</ol>' );
-        return join ' | ', @_ if @_ < 3 or $self->action =~ /view/;
-        return join ' | ', $_[0], $_[1], @_ - 2 . ' more...';
+        return join ', ', @_ if @_ < 3 or $self->template =~ /view/;
+        return join ', ', $_[0], $_[1], @_ - 2 . ' more...';
     };
     
     # XXX: getting a 'Use of uninitialized value in string eq warning' - looks like 
